@@ -73,7 +73,11 @@ a:hover { color: var(--accent2); }
   padding-top: 0.8rem; padding-bottom: 0.8rem;
 }
 .brand {
+  display: flex; align-items: center; gap: 0.6rem;
   font-size: 1.3rem; color: var(--ink); text-decoration: none; font-style: italic;
+}
+.brand-logo {
+  height: 2.4rem; width: 2.4rem; border-radius: 50%; object-fit: cover; flex: none;
 }
 .nav { display: flex; gap: 1.1rem; flex-wrap: wrap; }
 .nav a {

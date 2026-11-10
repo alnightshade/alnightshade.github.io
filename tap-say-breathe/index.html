@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tap, Say, Breathe — A.L. Nightshade</title>
+<meta name="description" content="Communication buttons — words, one tap away. For when speaking is too hard. Tap a button and it speaks out loud and shows on screen.">
+<link rel="stylesheet" href="../style.css">
+<link rel="icon" type="image/png" href="../images/logo.png">
+<style>
+  :root { --msg-size: 1.9rem; --btn-size: 1.05rem; }
+  body[data-textsize="small"] { --msg-size: 1.5rem; --btn-size: 0.95rem; }
+  body[data-textsize="large"] { --msg-size: 2.5rem; --btn-size: 1.2rem; }
+
+  .board { max-width: 860px; margin: 0 auto; padding: 0 1.25rem 3rem; }
+  .board-hero { text-align: center; padding: 3rem 0 1.5rem; }
+  .board-hero h1 { font-size: clamp(1.9rem, 4.5vw, 2.8rem); font-style: italic; }
+  .board-hero h1 em { color: var(--accent); }
+  .board-hero p { color: var(--muted); max-width: 60ch; margin: 1rem auto 0; font-size: 1.1rem; }
+
+  /* message display — sticky so it stays visible while tapping */
+  .msg-wrap {
+    position: sticky; top: 74px; z-index: 40;
+    background: var(--bg); padding: 0.75rem 0 0.5rem;
+  }
+  .msg-display {
+    background: var(--card); border: 2px solid var(--accent);
+    border-radius: var(--radius); padding: 1.25rem 1.5rem;
+    min-height: 6.5rem; display: flex; flex-direction: column;
+    justify-content: center; text-align: center;
+  }
+  .msg-label {
+    font-family: system-ui, -apple-system, sans-serif; font-size: 0.75rem;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted);
+    margin-bottom: 0.35rem;
+  }
+  .msg-text { font-size: var(--msg-size); line-height: 1.3; font-weight: 600; }
+  .msg-text.placeholder { color: var(--muted); font-weight: 400; font-style: italic; }
+  .msg-hint { color: var(--muted); font-size: 0.95rem; margin-top: 0.35rem; }
+
+  .msg-controls {
+    display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center;
+    margin-top: 0.75rem;
+  }
+  .chip-btn {
+    font-family: system-ui, -apple-system, sans-serif; font-size: 0.95rem; font-weight: 600;
+    background: var(--card); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 999px; padding: 0.55rem 1.1rem; cursor: pointer;
+  }
+  .chip-btn:hover { border-color: var(--accent); color: var(--accent2); }
+  .chip-btn[aria-pressed="true"] { background: var(--accent); color: #14101a; border-color: var(--accent); }
+
+  .toggles {
+    display: flex; gap: 1.25rem; flex-wrap: wrap; justify-content: center;
+    margin-top: 0.9rem; font-family: system-ui, -apple-system, sans-serif; font-size: 0.95rem;
+  }
+  .toggle { display: flex; align-items: center; gap: 0.55rem; cursor: pointer; color: var(--ink); }
+  .toggle small { color: var(--muted); }
+  .toggle input { width: 1.15rem; height: 1.15rem; accent-color: var(--accent); cursor: pointer; }
+  .size-btns { display: flex; gap: 0.35rem; align-items: center; }
+  .size-btns .chip-btn { padding: 0.4rem 0.8rem; }
+
+  .board h2 { margin-top: 2.75rem; }
+  .board h2 + p { color: var(--muted); margin-bottom: 1rem; font-style: italic; }
+  .btn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.9rem; }
+  .phrase-btn {
+    text-align: left; background: var(--card); color: var(--ink);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 1rem 1.1rem; cursor: pointer; font-family: inherit;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .phrase-btn:hover, .phrase-btn:focus-visible { border-color: var(--accent); transform: translateY(-2px); outline: none; }
+  .phrase-btn:active { transform: translateY(0); }
+  .phrase-btn .main { display: block; font-size: var(--btn-size); font-weight: 700; line-height: 1.35; }
+  .phrase-btn .sub { display: block; font-size: 0.9rem; color: var(--muted); font-style: italic; margin-top: 0.25rem; line-height: 1.4; }
+
+  .quick-grid { grid-template-columns: repeat(3, 1fr); }
+  .quick-grid .phrase-btn { text-align: center; padding: 1.1rem 0.75rem; }
+  .quick-grid .phrase-btn .main { font-size: calc(var(--btn-size) + 0.15rem); }
+
+  /* your own words */
+  .own-words textarea {
+    width: 100%; min-height: 90px; background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; color: var(--ink); padding: 0.8rem 1rem; font-size: 1.1rem; font-family: inherit;
+    resize: vertical;
+  }
+  .own-words textarea:focus { outline: none; border-color: var(--accent); }
+  .own-words .row { display: flex; gap: 0.6rem; margin-top: 0.75rem; flex-wrap: wrap; }
+
+  /* my card */
+  .card-form { display: grid; gap: 0.9rem; }
+  .card-form label { display: grid; gap: 0.35rem; font-family: system-ui, -apple-system, sans-serif; font-size: 0.95rem; }
+  .card-form input, .card-form textarea {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    color: var(--ink); padding: 0.7rem 0.9rem; font-size: 1rem; font-family: inherit; width: 100%;
+  }
+  .card-form input:focus, .card-form textarea:focus { outline: none; border-color: var(--accent); }
+  .card-preview {
+    margin-top: 1.25rem; background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 1.25rem 1.5rem;
+  }
+  .card-preview h3 { margin-top: 0; }
+  .card-preview dl { display: grid; gap: 0.5rem; margin-top: 0.75rem; }
+  .card-preview dt { font-family: system-ui, -apple-system, sans-serif; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .card-preview dd { font-size: 1.05rem; }
+
+  /* breathe */
+  .breathe-box { text-align: center; padding: 1.5rem 0 0.5rem; }
+  .breathe-circle {
+    width: 190px; height: 190px; margin: 1.25rem auto; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--accent2), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 4s ease-in-out;
+    box-shadow: 0 0 60px rgba(180, 138, 224, 0.35);
+  }
+  .breathe-circle span {
+    font-family: system-ui, -apple-system, sans-serif; font-weight: 700; font-size: 1.15rem; color: #14101a;
+  }
+  .breathe-status { font-family: system-ui, -apple-system, sans-serif; color: var(--muted); margin-top: 0.5rem; }
+  .breathe-box .row { display: flex; gap: 0.6rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap; }
+
+  .nearby-note {
+    margin-top: 2.75rem; background: var(--bg2); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 1.5rem;
+  }
+  .nearby-note h2 { margin-top: 0; }
+  .nearby-note p { color: var(--muted); }
+  .board-foot { text-align: center; color: var(--muted); font-style: italic; margin-top: 2.5rem; }
+
+  /* big overlay */
+  .big-overlay {
+    position: fixed; inset: 0; z-index: 100; background: var(--bg);
+    display: none; align-items: center; justify-content: center; padding: 2rem; text-align: center;
+  }
+  .big-overlay.open { display: flex; }
+  .big-overlay .big-text { font-size: clamp(2rem, 7vw, 4.5rem); line-height: 1.25; font-weight: 700; max-width: 20ch; }
+  .big-overlay .close-big {
+    position: absolute; top: 1rem; right: 1rem;
+    font-family: system-ui, -apple-system, sans-serif; font-size: 1rem; font-weight: 700;
+    background: var(--card); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 999px; padding: 0.6rem 1.2rem; cursor: pointer;
+  }
+
+  /* low stimulation mode */
+  body.low-stim { --accent: #9a8fb0; --accent2: #8fb8ac; }
+  body.low-stim .breathe-circle { box-shadow: none; background: var(--accent2); }
+  body.low-stim .board-hero { background: none; }
+  body.low-stim .phrase-btn:hover { transform: none; }
+  body.low-stim .msg-display { border-width: 1px; }
+
+  @media (max-width: 720px) {
+    .msg-wrap { top: 118px; }
+    .quick-grid { grid-template-columns: 1fr 1fr 1fr; gap: 0.6rem; }
+    .breathe-circle { width: 160px; height: 160px; }
+  }
+</style>
+</head>
+<body data-textsize="medium">
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="../"><img src="../images/logo.png" alt="A.L. Nightshade logo" class="brand-logo"> A.L. Nightshade</a>
+    <nav class="nav">
+      <a href="../#newest">Newest</a>
+      <a href="../#childrens">Children's Stories</a>
+      <a href="../#darker">Poetry &amp; Darker Fiction</a>
+      <a href="../#books">Books</a>
+      <a href="../#newsletter">Newsletter</a>
+      <a href="../#contact">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<main class="board">
+
+  <section class="board-hero">
+    <h1>Communication Buttons &mdash; <em>Words, one tap away.</em></h1>
+    <p>For when speaking is too hard &mdash; during a meltdown, a shutdown, or in a place that&rsquo;s just too much. Tap a button. It speaks out loud and shows on screen. No typing, no explaining.</p>
+  </section>
+
+  <!-- message display -->
+  <div class="msg-wrap">
+    <div class="msg-display" aria-live="polite">
+      <div class="msg-label">Your message will show here</div>
+      <div class="msg-text placeholder" id="msgText">Tap any button below and this will say it for you &mdash; out loud, and big enough to show someone.</div>
+    </div>
+    <div class="msg-controls">
+      <button class="chip-btn" type="button" id="sayAgainBtn">Say it again</button>
+      <button class="chip-btn" type="button" id="showBigBtn">Show it big</button>
+      <button class="chip-btn" type="button" id="clearMsgBtn">Clear</button>
+    </div>
+    <div class="toggles">
+      <label class="toggle"><input type="checkbox" id="speakToggle" checked> Speak out loud <small>&mdash; turn off to show words only</small></label>
+      <label class="toggle"><input type="checkbox" id="lowStimToggle"> Low stimulation <small>&mdash; calmer colours, no extras</small></label>
+      <span class="toggle">Sound: <button class="chip-btn" type="button" id="testSoundBtn">Test my sound</button></span>
+      <span class="size-btns" role="group" aria-label="Text size">
+        <button class="chip-btn" type="button" data-size="small" aria-label="Smaller text">A&minus;</button>
+        <button class="chip-btn" type="button" data-size="medium" aria-label="Normal text" aria-pressed="true">A</button>
+        <button class="chip-btn" type="button" data-size="large" aria-label="Larger text">A+</button>
+      </span>
+    </div>
+  </div>
+
+  <!-- quick answers -->
+  <section aria-label="Quick answers">
+    <div class="btn-grid quick-grid" id="quickGrid"></div>
+  </section>
+
+  <!-- start here -->
+  <section aria-label="Start here">
+    <h2>Start here</h2>
+    <p>The most important ones</p>
+    <div class="btn-grid" id="startGrid"></div>
+  </section>
+
+  <!-- i need -->
+  <section aria-label="I need">
+    <h2>I need&hellip;</h2>
+    <p>Tap what you need most</p>
+    <div class="btn-grid" id="needGrid"></div>
+  </section>
+
+  <!-- please -->
+  <section aria-label="Please">
+    <h2>Please&hellip;</h2>
+    <p>How others can help</p>
+    <div class="btn-grid" id="pleaseGrid"></div>
+  </section>
+
+  <!-- your own words -->
+  <section class="own-words" aria-label="Your own words">
+    <h2>Your own words</h2>
+    <p>If none of the buttons say it right, type your own message here. Nothing is saved &mdash; it&rsquo;s only for right now.</p>
+    <textarea id="ownWords" placeholder="Type your own message..." aria-label="Type your own message"></textarea>
+    <div class="row">
+      <button class="btn" type="button" id="sayOwnBtn">Say it</button>
+      <button class="chip-btn" type="button" id="clearOwnBtn">Clear</button>
+    </div>
+  </section>
+
+  <!-- my card -->
+  <section aria-label="My card">
+    <h2>My card</h2>
+    <p>Fill in only if you want to. For a stranger, a shop, or an emergency. Fill this in while you&rsquo;re calm, then tap &ldquo;Show my card&rdquo; when you need it. It stays on this screen only &mdash; closing the page clears it.</p>
+    <div class="card-form">
+      <label>My name
+        <input type="text" id="cardName" placeholder="Alex" autocomplete="off">
+      </label>
+      <label>Please contact
+        <input type="text" id="cardContact" placeholder="Name and phone number" autocomplete="off">
+      </label>
+      <label>What helps me
+        <input type="text" id="cardHelps" placeholder="Quiet room, headphones" autocomplete="off">
+      </label>
+      <label>What makes it worse
+        <input type="text" id="cardWorse" placeholder="Loud voices, crowds" autocomplete="off">
+      </label>
+    </div>
+    <div class="row" style="display:flex; gap:0.6rem; margin-top:1rem; flex-wrap:wrap;">
+      <button class="btn" type="button" id="showCardBtn">Show my card</button>
+      <button class="chip-btn" type="button" id="readCardBtn">Read my card out loud</button>
+    </div>
+    <div class="card-preview" id="cardPreview" aria-live="polite">
+      <p style="color: var(--muted);">Nothing on my card yet &mdash; fill in the fields above.</p>
+    </div>
+  </section>
+
+  <!-- breathe -->
+  <section aria-label="Breathe with me">
+    <h2>Breathe with me</h2>
+    <p>Only if it helps. It needs no counting, no speaking &mdash; just let yourself breathe. You can stop any time.</p>
+    <div class="breathe-box">
+      <p>Follow the circle. It will guide your breathing.</p>
+      <div class="breathe-circle" id="breatheCircle"><span id="breatheLabel">Ready</span></div>
+      <p class="breathe-status" id="breatheStatus">Ready</p>
+      <div class="row">
+        <button class="btn" type="button" id="startBreatheBtn">Start breathing</button>
+        <button class="chip-btn" type="button" id="stopBreatheBtn">Stop</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- note for the person nearby -->
+  <section class="nearby-note" aria-label="A note for the person nearby">
+    <h2>A note for the person nearby</h2>
+    <p>They are not being rude. They are overwhelmed. Please don&rsquo;t ask lots of questions. Use these buttons, speak slowly, and wait.</p>
+  </section>
+
+  <p class="board-foot">Made for the moments when words won&rsquo;t come. One tap is enough.</p>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p class="footer-brand">A.L. Nightshade</p>
+    <p class="social">
+      <a href="https://www.facebook.com/profile.php?id=61591885481773" target="_blank" rel="noopener">Facebook</a>
+      <a href="https://www.tiktok.com/@a.l.nightshade" target="_blank" rel="noopener">TikTok</a>
+      <a href="https://www.instagram.com/alnightshadeauthor" target="_blank" rel="noopener">Instagram</a>
+      <a href="https://www.youtube.com/@A.L.Nightshade" target="_blank" rel="noopener">YouTube</a>
+      <a href="https://bookumbrella.com/author/a-l-nightshade" target="_blank" rel="noopener">BookUmbrella</a>
+    </p>
+    <p class="copy">&copy; 2026 A.L. Nightshade. All rights reserved.</p>
+  </div>
+</footer>
+
+<div class="big-overlay" id="bigOverlay" role="dialog" aria-modal="true" aria-label="Message shown big">
+  <button class="close-big" type="button" id="closeBigBtn">Close</button>
+  <div class="big-text" id="bigText"></div>
+</div>
+<script>
+(function () {
+  "use strict";
+
+  var msgText = document.getElementById("msgText");
+  var placeholder = "Tap any button below and this will say it for you \u2014 out loud, and big enough to show someone.";
+  var currentMessage = "";
+  var speakToggle = document.getElementById("speakToggle");
+  var lowStimToggle = document.getElementById("lowStimToggle");
+
+  function speak(text) {
+    if (!speakToggle.checked || !text) return;
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.9;
+    window.speechSynthesis.speak(u);
+  }
+
+  function showMessage(text) {
+    currentMessage = text;
+    msgText.textContent = text;
+    msgText.classList.remove("placeholder");
+    speak(text);
+    var overlay = document.getElementById("bigOverlay");
+    if (overlay.classList.contains("open")) {
+      document.getElementById("bigText").textContent = text;
+    }
+  }
+
+  function clearMessage() {
+    currentMessage = "";
+    msgText.textContent = placeholder;
+    msgText.classList.add("placeholder");
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  }
+
+  // ---- phrase data (word-for-word from the app) ----
+  var quick = [
+    { main: "Yes" },
+    { main: "No" },
+    { main: "I don't know", sub: "Give me a moment" }
+  ];
+
+  var startHere = [
+    { main: "I'm autistic and I'm overwhelmed", sub: "Please be patient with me" },
+    { main: "I can't speak right now", sub: "I can hear you \u2014 please use these buttons with me" },
+    { main: "I'm having a meltdown", sub: "I'm not being rude, and I'm not angry at you" },
+    { main: "I'm overwhelmed, not angry", sub: "Please don't raise your voice" },
+    { main: "I need space, please", sub: "Don't follow me or touch me" },
+    { main: "I'm OK, I just need time", sub: "I'm not in danger. Please wait with me" }
+  ];
+
+  var need = [
+    { main: "I need help", sub: "Please stay with me" },
+    { main: "I need to leave", sub: "Take me somewhere quiet" },
+    { main: "I need water", sub: "Please, a drink of water" },
+    { main: "I need the toilet", sub: "I need the bathroom, please" },
+    { main: "I need to sit down", sub: "Somewhere quiet to sit" },
+    { main: "I need quiet", sub: "Too loud \u2014 please make it quieter" },
+    { main: "I'm in pain", sub: "Something hurts" },
+    { main: "I'm scared", sub: "I'm frightened \u2014 please stay calm" },
+    { main: "I'm tired", sub: "I need to rest" },
+    { main: "I'm hungry", sub: "I need something to eat" },
+    { main: "I need my headphones", sub: "Please, my headphones / ear defenders" },
+    { main: "I don't understand", sub: "Please say it again, more slowly" },
+    { main: "That's too much", sub: "Please slow down" }
+  ];
+
+  var please = [
+    { main: "Please wait", sub: "Please give me time to answer" },
+    { main: "Please speak slowly", sub: "One thing at a time, please" },
+    { main: "Please don't touch me", sub: "Don't touch me without asking first. If I move away, it's not about you." },
+    { main: "Please write it down", sub: "Please write it down for me" },
+    { main: "Please show me", sub: "Show me a picture or point to it" },
+    { main: "Please come with me", sub: "I need you to stay with me" },
+    { main: "Please take me home", sub: "I want to go home now" },
+    { main: "Please don't shout", sub: "Shouting makes it worse" },
+    { main: "Please ask yes or no", sub: "Yes-or-no questions only, please" },
+    { main: "Please be patient", sub: "I'm trying \u2014 please be patient" }
+  ];
+
+  function renderButtons(containerId, items) {
+    var grid = document.getElementById(containerId);
+    items.forEach(function (item) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "phrase-btn";
+      var main = document.createElement("span");
+      main.className = "main";
+      main.textContent = item.main;
+      b.appendChild(main);
+      if (item.sub) {
+        var sub = document.createElement("span");
+        sub.className = "sub";
+        sub.textContent = item.sub;
+        b.appendChild(sub);
+      }
+      b.addEventListener("click", function () { showMessage(item.main); });
+      grid.appendChild(b);
+    });
+  }
+
+  renderButtons("quickGrid", quick);
+  renderButtons("startGrid", startHere);
+  renderButtons("needGrid", need);
+  renderButtons("pleaseGrid", please);
+
+  // ---- message controls ----
+  document.getElementById("sayAgainBtn").addEventListener("click", function () {
+    if (currentMessage) speak(currentMessage);
+  });
+  document.getElementById("showBigBtn").addEventListener("click", function () {
+    if (!currentMessage) return;
+    document.getElementById("bigText").textContent = currentMessage;
+    document.getElementById("bigOverlay").classList.add("open");
+  });
+  document.getElementById("closeBigBtn").addEventListener("click", function () {
+    document.getElementById("bigOverlay").classList.remove("open");
+  });
+  document.getElementById("bigOverlay").addEventListener("click", function (e) {
+    if (e.target === this) this.classList.remove("open");
+  });
+  document.getElementById("clearMsgBtn").addEventListener("click", clearMessage);
+
+  document.getElementById("testSoundBtn").addEventListener("click", function () {
+    speak("Hello. Can you hear me?");
+  });
+
+  lowStimToggle.addEventListener("change", function () {
+    document.body.classList.toggle("low-stim", lowStimToggle.checked);
+  });
+
+  // text size
+  var sizeBtns = document.querySelectorAll(".size-btns .chip-btn");
+  sizeBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.body.setAttribute("data-textsize", btn.getAttribute("data-size"));
+      sizeBtns.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+    });
+  });
+
+  // ---- your own words ----
+  var ownWords = document.getElementById("ownWords");
+  document.getElementById("sayOwnBtn").addEventListener("click", function () {
+    var text = ownWords.value.trim();
+    if (text) showMessage(text);
+  });
+  document.getElementById("clearOwnBtn").addEventListener("click", function () {
+    ownWords.value = "";
+    ownWords.focus();
+  });
+
+  // ---- my card (nothing is saved — closing the page clears it) ----
+  var cardPreview = document.getElementById("cardPreview");
+  function cardText() {
+    var parts = [];
+    var name = document.getElementById("cardName").value.trim();
+    var contact = document.getElementById("cardContact").value.trim();
+    var helps = document.getElementById("cardHelps").value.trim();
+    var worse = document.getElementById("cardWorse").value.trim();
+    if (name) parts.push("My name is " + name + ".");
+    if (contact) parts.push("Please contact " + contact + ".");
+    if (helps) parts.push("What helps me: " + helps + ".");
+    if (worse) parts.push("What makes it worse: " + worse + ".");
+    return { parts: parts, name: name, contact: contact, helps: helps, worse: worse };
+  }
+
+  document.getElementById("showCardBtn").addEventListener("click", function () {
+    var c = cardText();
+    if (!c.parts.length) {
+      cardPreview.innerHTML = "<p style=\"color: var(--muted);\">Nothing on my card yet \u2014 fill in the fields above.</p>";
+      return;
+    }
+    var html = "<h3>My card</h3><dl>";
+    if (c.name) html += "<dt>My name</dt><dd>" + escapeHtml(c.name) + "</dd>";
+    if (c.contact) html += "<dt>Please contact</dt><dd>" + escapeHtml(c.contact) + "</dd>";
+    if (c.helps) html += "<dt>What helps me</dt><dd>" + escapeHtml(c.helps) + "</dd>";
+    if (c.worse) html += "<dt>What makes it worse</dt><dd>" + escapeHtml(c.worse) + "</dd>";
+    html += "</dl>";
+    cardPreview.innerHTML = html;
+  });
+
+  document.getElementById("readCardBtn").addEventListener("click", function () {
+    var c = cardText();
+    if (c.parts.length) speak(c.parts.join(" "));
+  });
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // ---- breathe with me ----
+  var circle = document.getElementById("breatheCircle");
+  var breatheLabel = document.getElementById("breatheLabel");
+  var breatheStatus = document.getElementById("breatheStatus");
+  var breatheTimer = null;
+  var breathing = false;
+
+  function breatheCycle(phase) {
+    if (!breathing) return;
+    if (phase === "in") {
+      breatheLabel.textContent = "Breathe in";
+      breatheStatus.textContent = "Breathe in";
+      circle.style.transform = "scale(1.35)";
+      breatheTimer = setTimeout(function () { breatheCycle("out"); }, 4000);
+    } else {
+      breatheLabel.textContent = "Breathe out";
+      breatheStatus.textContent = "Breathe out";
+      circle.style.transform = "scale(1)";
+      breatheTimer = setTimeout(function () { breatheCycle("in"); }, 4000);
+    }
+  }
+
+  document.getElementById("startBreatheBtn").addEventListener("click", function () {
+    if (breathing) return;
+    breathing = true;
+    breatheCycle("in");
+  });
+
+  document.getElementById("stopBreatheBtn").addEventListener("click", function () {
+    breathing = false;
+    if (breatheTimer) { clearTimeout(breatheTimer); breatheTimer = null; }
+    circle.style.transform = "scale(1)";
+    breatheLabel.textContent = "Ready";
+    breatheStatus.textContent = "Ready";
+  });
+})();
+</script>
+</body>
+</html>
